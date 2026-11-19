@@ -1,0 +1,12 @@
+node_modules
+dist
+*.log
+*.err
+*.tsbuildinfo
+.DS_Store
+.env
+.env.local
+server/data/*.db
+server/data/*.db-journal
+server/data/*.db-wal
+server/data/*.db-shm
