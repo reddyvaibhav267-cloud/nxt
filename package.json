@@ -1,0 +1,21 @@
+{
+  "name": "nxt",
+  "private": true,
+  "version": "1.0.0",
+  "description": "nxt \u2014 live niche trends intelligence for dropshipping",
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "node init && concurrently -k -n server,client -c magenta,cyan \"npm run dev -w server\" \"npm run dev -w client\"",
+    "build": "node init && npm run build -w server && npm run build -w client",
+    "start": "node init && npm run start -w server",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w client",
+    "seed": "npm run seed -w server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "node-fetch": "^3.3.2"
+  }
+}
