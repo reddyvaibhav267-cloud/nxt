@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -6,6 +6,7 @@ import { Counter } from '../components/motion/Counter';
 import { TrendOrb } from '../components/three/TrendOrb';
 import { NodeFlowView } from '../components/graph/NodeFlowView';
 import { useRefreshStream } from '../hooks/useRefreshStream';
+import { onRefreshEvent } from '../api/stream';
 
 type SortKey = 'opportunity' | 'demand' | 'growth' | 'name';
 
@@ -19,7 +20,7 @@ export default function Dashboard() {
     refetchInterval: 45_000,
   });
 
-  const { data: nichesRes, isLoading: nichesLoading, refetch: refetchNiches } = useQuery({
+  const { data: nichesRes, isLoading: nichesLoading } = useQuery({
     queryKey: ['niches'],
     queryFn: ({ signal }) => api.niches(signal),
     refetchInterval: 60_000,
@@ -39,6 +40,30 @@ export default function Dashboard() {
 
   const { connected, events } = useRefreshStream();
   const lastEvent = events[0];
+
+  // "refresh now" kicks off a server-side scrape (POST /api/refresh) which
+  // streams results back over SSE — the button stays busy until the first
+  // refresh event lands, so it never looks like a dead click.
+  const [syncing, setSyncing] = useState(false);
+  useEffect(() => {
+    if (!syncing) return;
+    const off = onRefreshEvent(() => setSyncing(false));
+    const fallback = setTimeout(() => setSyncing(false), 60_000);
+    return () => {
+      off();
+      clearTimeout(fallback);
+    };
+  }, [syncing]);
+
+  const triggerRefresh = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      await api.refresh('all');
+    } catch {
+      setSyncing(false);
+    }
+  };
 
   const stats = statsRes?.data;
   const sources = sourcesRes?.data ?? [];
@@ -105,10 +130,11 @@ export default function Dashboard() {
               </span>
               <button
                 type="button"
-                onClick={() => refetchNiches()}
-                className="rounded-full border border-line-bright px-4 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-mist transition-colors hover:border-lime/50 hover:text-bone"
+                onClick={() => void triggerRefresh()}
+                disabled={syncing}
+                className="rounded-full border border-line-bright px-4 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-mist transition-colors hover:border-lime/50 hover:text-bone disabled:cursor-wait disabled:opacity-60"
               >
-                refresh now
+                {syncing ? 'syncing…' : 'refresh now'}
               </button>
             </div>
           </div>

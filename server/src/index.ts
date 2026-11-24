@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
 import { api } from './routes/api.js';
 import { getDb } from './db/index.js';
+import { refreshLog } from './db/repo.js';
 import { onRefresh, startScheduler, stopScheduler, refreshers, bootstrapNiches } from './scheduler/refresh.js';
 import type { RefreshEvent } from './types.js';
 
@@ -31,7 +32,15 @@ app.get('/api/stream', (req, res) => {
     Connection: 'keep-alive',
     'X-Accel-Buffering': 'no',
   });
-  res.write(`event: hello\ndata: ${JSON.stringify({ at: new Date().toISOString() })}\n\n`);
+  // Replay recent refresh history so a client that connects after boot (or
+  // reconnects after a drop) immediately shows the last event instead of
+  // waiting up to an hour for the next cron tick.
+  res.write(
+    `event: hello\ndata: ${JSON.stringify({
+      at: new Date().toISOString(),
+      recent: refreshLog.slice(0, 5),
+    })}\n\n`,
+  );
 
   sseClients.add(res);
   const ping = setInterval(() => {
@@ -62,19 +71,30 @@ onRefresh(broadcast);
 app.use('/api', api);
 
 // Manual refresh — used by the dashboard "sync" button and dev workflows.
-app.post('/api/refresh', async (_req, res) => {
+// Responds immediately and runs in the background: results are pushed to
+// every client over /api/stream, so holding the HTTP connection open for
+// the full scrape (40s+) only made the button look frozen.
+let refreshInFlight = false;
+app.post('/api/refresh', (_req, res) => {
   const which = (_req.query.source as string) || 'all';
-  const run = async () => {
-    if (which === 'all' || which === 'google_trends') await refreshers.refreshGoogleTrends();
-    if (which === 'all' || which === 'amazon') await refreshers.refreshAmazon();
-    if (which === 'all' || which === 'tiktok') await refreshers.refreshTikTok();
-  };
-  try {
-    await run();
-    res.json({ ok: true, ran: which, at: new Date().toISOString() });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: (e as Error).message });
+  if (refreshInFlight) {
+    res.json({ ok: true, ran: 'in-flight', at: new Date().toISOString() });
+    return;
   }
+  refreshInFlight = true;
+  const run = async () => {
+    const jobs: Promise<void>[] = [];
+    if (which === 'all' || which === 'google_trends') jobs.push(refreshers.refreshGoogleTrends());
+    if (which === 'all' || which === 'amazon') jobs.push(refreshers.refreshAmazon());
+    if (which === 'all' || which === 'tiktok') jobs.push(refreshers.refreshTikTok());
+    await Promise.allSettled(jobs);
+  };
+  run()
+    .catch(() => { /* refreshers emit their own error events */ })
+    .finally(() => {
+      refreshInFlight = false;
+    });
+  res.json({ ok: true, ran: which, at: new Date().toISOString() });
 });
 
 /* --------------------------------------------------- static client (prod) */
