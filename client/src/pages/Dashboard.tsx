@@ -14,7 +14,12 @@ export default function Dashboard() {
   const [sort, setSort] = useState<SortKey>('opportunity');
   const [query, setQuery] = useState('');
 
-  const { data: statsRes, isLoading: statsLoading } = useQuery({
+  const {
+    data: statsRes,
+    isLoading: statsLoading,
+    isFetching: statsFetching,
+    dataUpdatedAt,
+  } = useQuery({
     queryKey: ['stats'],
     queryFn: ({ signal }) => api.stats(signal),
     refetchInterval: 45_000,
@@ -40,6 +45,16 @@ export default function Dashboard() {
 
   const { connected, events } = useRefreshStream();
   const lastEvent = events[0];
+
+  // Brief highlight whenever fresh stats land (SSE invalidate or poll) so a
+  // refresh is visible even when the scraped numbers happen to be identical.
+  const [pulse, setPulse] = useState(false);
+  useEffect(() => {
+    if (!dataUpdatedAt) return;
+    setPulse(true);
+    const t = setTimeout(() => setPulse(false), 900);
+    return () => clearTimeout(t);
+  }, [dataUpdatedAt]);
 
   // "refresh now" kicks off a server-side scrape (POST /api/refresh) which
   // streams results back over SSE — the button stays busy until the first
@@ -68,6 +83,9 @@ export default function Dashboard() {
   const stats = statsRes?.data;
   const sources = sourcesRes?.data ?? [];
   const liveCount = sources.filter((s) => s.status === 'live').length;
+  const lastRefreshLabel = stats?.lastRefreshAt
+    ? new Date(stats.lastRefreshAt).toLocaleTimeString()
+    : '—';
 
   const niches = useMemo(() => {
     const list = [...(nichesRes?.data ?? [])];
@@ -131,16 +149,18 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => void triggerRefresh()}
-                disabled={syncing}
+                disabled={syncing || statsFetching}
                 className="rounded-full border border-line-bright px-4 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-mist transition-colors hover:border-lime/50 hover:text-bone disabled:cursor-wait disabled:opacity-60"
               >
-                {syncing ? 'syncing…' : 'refresh now'}
+                {syncing || statsFetching ? 'syncing…' : 'refresh now'}
               </button>
             </div>
           </div>
 
           {/* Stat strip */}
-          <div className="mt-8 grid grid-cols-2 gap-px border border-line bg-line md:grid-cols-4">
+          <div
+            className={`mt-8 grid grid-cols-2 gap-px border border-line bg-line md:grid-cols-4 ${pulse ? 'refresh-pulse' : ''}`}
+          >
             <Cell label="niches" value={stats?.nichesTracked ?? 0} loading={statsLoading} />
             <Cell label="products" value={stats?.productsTracked ?? 0} loading={statsLoading} />
             <Cell label="data points" value={stats?.dataPoints ?? 0} loading={statsLoading} />
@@ -153,12 +173,24 @@ export default function Dashboard() {
             />
           </div>
 
-          {lastEvent && (
-            <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.14em] text-fog">
-              last event · {lastEvent.source} · {new Date(lastEvent.at).toLocaleTimeString()}
-              {lastEvent.status ? ` · ${lastEvent.status}` : ''}
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            {lastEvent && (
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-fog">
+                last event · {lastEvent.source} · {new Date(lastEvent.at).toLocaleTimeString()}
+                {lastEvent.status ? ` · ${lastEvent.status}` : ''}
+                {typeof lastEvent.count === 'number' && lastEvent.count > 0
+                  ? ` · ${lastEvent.count}`
+                  : ''}
+              </p>
+            )}
+            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-fog">
+              last refresh · {lastRefreshLabel}
+              {typeof stats?.refreshesToday === 'number'
+                ? ` · ${stats.refreshesToday} today`
+                : ''}
+              {statsFetching ? ' · fetching…' : ''}
             </p>
-          )}
+          </div>
         </div>
       </section>
 

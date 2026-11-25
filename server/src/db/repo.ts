@@ -182,7 +182,7 @@ export function listProducts(opts: {
   sort?: 'score' | 'velocity' | 'rank';
   limit?: number;
 } = {}): Product[] {
-  const limit = Math.min(opts.limit ?? 60, 200);
+  const limit = Math.min(opts.limit ?? 60, 500);
   const where: string[] = [];
   const params: unknown[] = [];
   if (opts.niche) {

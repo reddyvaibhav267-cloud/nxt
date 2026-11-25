@@ -239,7 +239,7 @@ export function rowsToProducts(
   for (const [key, rows] of rowsByCategory) {
     const [, sortLabel] = key.split('::');
     const category = key.split('::')[0];
-    rows.slice(0, 8).forEach((row, idx) => {
+    rows.slice(0, 12).forEach((row, idx) => {
       const text = `${row.title ?? ''} ${row.desc ?? ''}`;
       const slug =
         assignNiche(text, nicheKeywords) ??

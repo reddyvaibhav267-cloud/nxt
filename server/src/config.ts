@@ -23,14 +23,14 @@ export const config = {
   } as Record<string, string>,
   /** Hard daily request caps per source (politeness). */
   dailyCaps: {
-    google_trends: 60,
+    google_trends: 120,
     amazon: 96,
     tiktok: 240,
   } as Record<string, number>,
 };
 
 export const GOOGLE_TRENDS_KEYWORDS: string[] = [
-  // Primary keyword of the first 20 catalogue niches (4 batches of 5).
+  // Primary keywords across the full niche catalogue (batched 5-per-request).
   'portable blender',
   'neck massager',
   'led dog collar',
@@ -51,6 +51,27 @@ export const GOOGLE_TRENDS_KEYWORDS: string[] = [
   'ring light',
   'portable espresso maker',
   'hair straightener brush',
+  // Secondary keywords — doubles series volume without new niches.
+  'electric lunch box',
+  'acupressure mat',
+  'pet hair remover',
+  'galaxy projector',
+  'portable monitor',
+  'car organizer',
+  'desk organizer',
+  'posture corrector',
+  'automatic cat feeder',
+  'laptop stand',
+  'tire inflator',
+  'water flosser',
+  'scalp massager',
+  'phone stand',
+  'cable organizer',
+  'air purifier bag',
+  'mini fridge',
+  'neck pillow',
+  'resistance bands',
+  'yoga mat',
 ];
 
 /**
@@ -68,6 +89,14 @@ export const AMAZON_CATEGORIES: { id: string; name: string; path: string }[] = [
   { id: 'best-toys', name: 'Toys & Games', path: '/Best-Sellers-Toys-Games/zgbs/toys-and-games/' },
   { id: 'best-baby', name: 'Baby', path: '/Best-Sellers-Baby/zgbs/baby-products/' },
   { id: 'best-tools', name: 'Tools & Home Improvement', path: '/Best-Sellers-Tools-Home-Improvement/zgbs/hi/' },
+  { id: 'best-office', name: 'Office Products', path: '/Best-Sellers-Office-Products/zgbs/office-products/' },
+  { id: 'best-patio', name: 'Patio, Lawn & Garden', path: '/Best-Sellers-Patio-Lawn-Garden/zgbs/lawn-garden/' },
+  { id: 'best-auto', name: 'Automotive', path: '/Best-Sellers-Automotive/zgbs/automotive/' },
+  { id: 'best-health', name: 'Health & Household', path: '/Best-Sellers-Health-Household/zgbs/hpc/' },
+  { id: 'best-home', name: 'Home & Living', path: '/Best-Sellers-Home-Kitchen/zgbs/home-garden/' },
   { id: 'new-kitchen', name: 'Home & Kitchen', path: '/gp/new-releases/kitchen/' },
   { id: 'new-electronics', name: 'Electronics', path: '/gp/new-releases/electronics/' },
+  { id: 'new-pet', name: 'Pet Supplies', path: '/gp/new-releases/pet-supplies/' },
+  { id: 'new-beauty', name: 'Beauty & Care', path: '/gp/new-releases/beauty/' },
+  { id: 'new-sports', name: 'Sports & Outdoors', path: '/gp/new-releases/sports/' },
 ];

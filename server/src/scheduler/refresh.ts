@@ -150,9 +150,10 @@ async function refreshAmazon(): Promise<void> {
       };
     });
 
-    // Keep only the strongest rows so the grid stays readable.
+    // Keep the strongest rows so the grid stays readable — but leave enough
+    // headroom that a category sweep actually shows up in the product feed.
     products.sort((a, b) => b.score - a.score);
-    replaceProductsForSource('amazon', products.slice(0, 80));
+    replaceProductsForSource('amazon', products.slice(0, 200));
 
     recordHealth(source, { status: 'live', ok: true, itemCount: products.length });
     emit({ type: 'refresh', source, status: 'ok', at: startedAt, count: products.length });
@@ -208,7 +209,7 @@ async function refreshTikTok(): Promise<void> {
     ).map((p) => ({ ...p, score: productScore({ ...p, metricValue: p.metricValue }) }));
 
     products.sort((a, b) => b.score - a.score);
-    replaceProductsForSource('tiktok', products.slice(0, 80));
+    replaceProductsForSource('tiktok', products.slice(0, 120));
 
     recordHealth(source, { status: 'live', ok: true, itemCount: products.length });
     emit({ type: 'refresh', source, status: 'ok', at: startedAt, count: products.length });

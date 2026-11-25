@@ -74,7 +74,7 @@ export const NICHE_SEEDS: NicheSeed[] = [
     category: 'Electronics',
     description:
       'Nomad-friendly gear: mini projectors, portable monitors, ergonomic keyboards and laptop risers.',
-    keywords: ['mini projector', 'portable monitor', 'ergonomic keyboard', 'laptop stand'],
+    keywords: ['mini projector', 'portable monitor', 'ergonomic keyboard', 'laptop stand', 'phone stand', 'mini fridge'],
     marginBand: 'mid',
     avgPriceUsd: 72,
     saturation: 0.55,
@@ -126,7 +126,7 @@ export const NICHE_SEEDS: NicheSeed[] = [
     category: 'Health & Beauty',
     description:
       'Salon-at-home electronics: LED masks, microcurrent tools, scalp massagers, nail lamps.',
-    keywords: ['led face mask', 'microcurrent device', 'scalp massager', 'nail lamp'],
+    keywords: ['led face mask', 'microcurrent device', 'scalp massager', 'nail lamp', 'water flosser'],
     marginBand: 'high',
     avgPriceUsd: 64,
     saturation: 0.58,
@@ -152,7 +152,7 @@ export const NICHE_SEEDS: NicheSeed[] = [
     category: 'Office',
     description:
       'Cable-free, camera-ready desks: monitor light bars, felt organizers, mechanical accessories.',
-    keywords: ['monitor light bar', 'desk mat', 'cable management', 'mechanical keyboard'],
+    keywords: ['monitor light bar', 'desk mat', 'cable management', 'mechanical keyboard', 'desk organizer', 'cable organizer'],
     marginBand: 'mid',
     avgPriceUsd: 38,
     saturation: 0.49,
@@ -165,7 +165,7 @@ export const NICHE_SEEDS: NicheSeed[] = [
     category: 'Travel',
     description:
       'Packable problem-solvers: compression cubes, anti-theft bags, universal adapters, neck pillows.',
-    keywords: ['packing cubes', 'anti theft backpack', 'travel adapter', 'neck pillow'],
+    keywords: ['packing cubes', 'anti theft backpack', 'travel adapter', 'neck pillow', 'air purifier bag'],
     marginBand: 'low',
     avgPriceUsd: 27,
     saturation: 0.6,
@@ -321,7 +321,7 @@ export const NICHE_SEEDS: NicheSeed[] = [
     category: 'Sports & Outdoors',
     description:
       'Track-everything fitness: smart jump ropes, body-fat scales, resistance gear and rollers.',
-    keywords: ['smart jump rope', 'body fat scale', 'resistance bands', 'foam roller'],
+    keywords: ['smart jump rope', 'body fat scale', 'resistance bands', 'foam roller', 'yoga mat'],
     marginBand: 'mid',
     avgPriceUsd: 37,
     saturation: 0.57,

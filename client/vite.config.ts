@@ -19,6 +19,18 @@ export default defineConfig({
       '/api': {
         target: API_TARGET,
         changeOrigin: true,
+        // SSE must stream: stop the proxy (and any upstream) from buffering
+        // text/event-stream responses, which would delay refresh events.
+        selfHandleResponse: false,
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes) => {
+            const type = proxyRes.headers['content-type'];
+            if (typeof type === 'string' && type.includes('text/event-stream')) {
+              proxyRes.headers['cache-control'] = 'no-cache, no-transform';
+              delete proxyRes.headers['content-length'];
+            }
+          });
+        },
       },
     },
   },

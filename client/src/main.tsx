@@ -20,15 +20,21 @@ const queryClient = new QueryClient({
 
 // Auto-refresh the feed: every server refresh event invalidates cached data so
 // open pages update without a reload. Debounced because sources emit in bursts.
+// invalidateQueries marks matching keys stale; refetchQueries forces an immediate
+// network round-trip so "refresh now" and cron ticks always hit the server.
 let refreshTimer: ReturnType<typeof setTimeout> | undefined;
 onRefreshEvent(() => {
   if (refreshTimer) clearTimeout(refreshTimer);
   refreshTimer = setTimeout(() => {
     refreshTimer = undefined;
-    for (const key of ['stats', 'niches', 'niche', 'products', 'sources']) {
+    const keys = ['stats', 'niches', 'niche', 'products', 'sources'] as const;
+    for (const key of keys) {
       void queryClient.invalidateQueries({ queryKey: [key] });
     }
-  }, 800);
+    void queryClient.refetchQueries({ queryKey: ['stats'] });
+    void queryClient.refetchQueries({ queryKey: ['niches'] });
+    void queryClient.refetchQueries({ queryKey: ['sources'] });
+  }, 400);
 });
 
 createRoot(document.getElementById('root')!).render(
