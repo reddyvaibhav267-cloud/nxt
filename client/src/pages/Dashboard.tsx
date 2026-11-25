@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -7,8 +7,30 @@ import { TrendOrb } from '../components/three/TrendOrb';
 import { NodeFlowView } from '../components/graph/NodeFlowView';
 import { useRefreshStream } from '../hooks/useRefreshStream';
 import { onRefreshEvent } from '../api/stream';
+import type { RefreshEvent } from '../api/types';
 
 type SortKey = 'opportunity' | 'demand' | 'growth' | 'name';
+
+const SOURCE_LABELS: Record<string, string> = {
+  google_trends: 'Google Trends',
+  amazon: 'Amazon',
+  tiktok: 'TikTok',
+  seed: 'Seed',
+};
+
+function relativeTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms)) return '—';
+  const s = Math.max(0, Math.floor(ms / 1000));
+  if (s < 5) return 'just now';
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
 
 export default function Dashboard() {
   const [sort, setSort] = useState<SortKey>('opportunity');
@@ -31,7 +53,7 @@ export default function Dashboard() {
     refetchInterval: 60_000,
   });
 
-  const { data: sourcesRes } = useQuery({
+  const { data: sourcesRes, dataUpdatedAt: sourcesUpdatedAt } = useQuery({
     queryKey: ['sources'],
     queryFn: ({ signal }) => api.sources(signal),
     refetchInterval: 45_000,
@@ -49,12 +71,35 @@ export default function Dashboard() {
   // Brief highlight whenever fresh stats land (SSE invalidate or poll) so a
   // refresh is visible even when the scraped numbers happen to be identical.
   const [pulse, setPulse] = useState(false);
+  const pulseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
     if (!dataUpdatedAt) return;
+    setPulse(false);
+    // Force reflow so restarting the CSS animation always plays.
+    void document.body.offsetHeight;
     setPulse(true);
-    const t = setTimeout(() => setPulse(false), 900);
-    return () => clearTimeout(t);
+    if (pulseTimer.current) clearTimeout(pulseTimer.current);
+    pulseTimer.current = setTimeout(() => setPulse(false), 1200);
+    return () => {
+      if (pulseTimer.current) clearTimeout(pulseTimer.current);
+    };
   }, [dataUpdatedAt]);
+
+  // Toast for each live SSE refresh event — proves the pipeline fired even
+  // when every number on screen stays the same.
+  const [toast, setToast] = useState<RefreshEvent | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => {
+    const off = onRefreshEvent((ev) => {
+      setToast(ev);
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+      toastTimer.current = setTimeout(() => setToast(null), 4500);
+    });
+    return () => {
+      off();
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    };
+  }, []);
 
   // "refresh now" kicks off a server-side scrape (POST /api/refresh) which
   // streams results back over SSE — the button stays busy until the first
@@ -86,6 +131,16 @@ export default function Dashboard() {
   const lastRefreshLabel = stats?.lastRefreshAt
     ? new Date(stats.lastRefreshAt).toLocaleTimeString()
     : '—';
+  // Ticker so the strip always shows motion after a refresh.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const lastRefreshAgo = relativeTime(stats?.lastRefreshAt);
+  const sourcesAgo = relativeTime(
+    sourcesUpdatedAt ? new Date(sourcesUpdatedAt).toISOString() : null,
+  );
 
   const niches = useMemo(() => {
     const list = [...(nichesRes?.data ?? [])];
@@ -159,6 +214,7 @@ export default function Dashboard() {
 
           {/* Stat strip */}
           <div
+            key={dataUpdatedAt}
             className={`mt-8 grid grid-cols-2 gap-px border border-line bg-line md:grid-cols-4 ${pulse ? 'refresh-pulse' : ''}`}
           >
             <Cell label="niches" value={stats?.nichesTracked ?? 0} loading={statsLoading} />
@@ -174,25 +230,59 @@ export default function Dashboard() {
           </div>
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <span
+                key={stats?.lastRefreshAt ?? 'none'}
+                className={`refresh-chip inline-flex items-center gap-2 rounded-full border px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] ${
+                  stats?.lastRefreshAt
+                    ? 'border-lime/40 bg-lime/10 text-lime'
+                    : 'border-line-bright text-fog'
+                }`}
+                title={stats?.lastRefreshAt ?? undefined}
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-lime" />
+                refreshed {lastRefreshAgo}
+              </span>
+              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-fog">
+                {lastRefreshLabel}
+                {typeof stats?.refreshesToday === 'number'
+                  ? ` · ${stats.refreshesToday} refreshes today`
+                  : ''}
+                {statsFetching ? ' · fetching…' : ''}
+              </p>
+            </div>
             {lastEvent && (
               <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-fog">
-                last event · {lastEvent.source} · {new Date(lastEvent.at).toLocaleTimeString()}
+                last event · {SOURCE_LABELS[lastEvent.source] ?? lastEvent.source} ·{' '}
+                {new Date(lastEvent.at).toLocaleTimeString()}
                 {lastEvent.status ? ` · ${lastEvent.status}` : ''}
                 {typeof lastEvent.count === 'number' && lastEvent.count > 0
-                  ? ` · ${lastEvent.count}`
+                  ? ` · ${lastEvent.count} items`
                   : ''}
+                {lastEvent.message ? ` · ${lastEvent.message.slice(0, 60)}` : ''}
               </p>
             )}
-            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-fog">
-              last refresh · {lastRefreshLabel}
-              {typeof stats?.refreshesToday === 'number'
-                ? ` · ${stats.refreshesToday} today`
-                : ''}
-              {statsFetching ? ' · fetching…' : ''}
-            </p>
           </div>
         </div>
       </section>
+
+      {/* Toast — always-visible proof a refresh event arrived over SSE */}
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-5 right-5 z-50 max-w-[min(360px,calc(100vw-2.5rem))] rounded-lg border border-lime/40 bg-panel px-4 py-3 shadow-[0_0_24px_-8px_var(--color-lime)] refresh-chip"
+        >
+          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-lime">
+            refresh · {SOURCE_LABELS[toast.source] ?? toast.source} · {toast.status}
+          </p>
+          <p className="mt-1 font-mono text-[11px] text-mist">
+            {new Date(toast.at).toLocaleTimeString()}
+            {typeof toast.count === 'number' ? ` · ${toast.count} items` : ''}
+            {toast.message ? ` · ${toast.message}` : ''}
+          </p>
+        </div>
+      )}
 
       {/* Orb + sources */}
       <section className="border-b border-line">
@@ -221,7 +311,7 @@ export default function Dashboard() {
                       className="flex items-center justify-between gap-4 border-b border-line pb-2"
                     >
                       <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-mist">
-                        {s.source.replace(/_/g, ' ')}
+                        {SOURCE_LABELS[s.source] ?? s.source.replace(/_/g, ' ')}
                       </span>
                       <span
                         className={`font-mono text-[10px] uppercase tracking-[0.14em] ${
@@ -231,9 +321,11 @@ export default function Dashboard() {
                               ? 'text-signal'
                               : 'text-fog'
                         }`}
+                        title={s.lastError ?? s.lastOkAt ?? undefined}
                       >
                         {s.status}
                         {typeof s.itemCount === 'number' ? ` · ${s.itemCount}` : ''}
+                        {s.lastOkAt ? ` · ${relativeTime(s.lastOkAt)}` : ''}
                       </span>
                     </div>
                   ))}
@@ -242,7 +334,7 @@ export default function Dashboard() {
                   )}
                 </div>
                 <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-fog">
-                  {liveCount}/{sources.length || 0} sources live
+                  {liveCount}/{sources.length || 0} sources live · health {sourcesAgo}
                 </p>
               </div>
             </div>
@@ -436,7 +528,7 @@ function Cell({
         {loading ? (
           <span className="inline-block h-[1em] w-16 animate-pulse rounded bg-line" />
         ) : (
-          <Counter value={value} decimals={decimals} />
+          <Counter value={value} decimals={decimals} live />
         )}
       </p>
     </div>

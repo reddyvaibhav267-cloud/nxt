@@ -121,6 +121,24 @@ const server = app.listen(config.port, () => {
   startScheduler();
 });
 
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    // eslint-disable-next-line no-console
+    console.error(
+      `\n  EADDRINUSE  →  port ${config.port} is already in use.\n` +
+        `  Another nxt server (or a leftover npm run dev) is still running.\n` +
+        `  Stop it first, e.g. on Windows:\n` +
+        `    netstat -ano | findstr :${config.port}\n` +
+        `    taskkill /PID <pid> /F\n` +
+        `  Or from the repo root:  npm run dev   (only once)\n`,
+    );
+    process.exit(1);
+  }
+  // eslint-disable-next-line no-console
+  console.error(err);
+  process.exit(1);
+});
+
 function shutdown(): void {
   stopScheduler();
   for (const c of sseClients) c.end();
